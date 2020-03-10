@@ -12,6 +12,6 @@ import (
 )
 
 func main() {
-	//NOTE the PrintF for the display of variables
+	//NOTE the PrintF for the display of variables, instead of Println
 	fmt.Printf("The square root of 7 is %g, I think.\n", math.Sqrt(7))
 }

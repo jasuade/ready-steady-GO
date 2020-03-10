@@ -9,3 +9,6 @@ following the exercises found in the following resources:
 - Go by examples: https://gobyexample.com/
 - Go Introduction: https://github.com/xperimental/go-intro
 - Awesome GO: https://awesome-go.com/#resources
+- Structure of GO: https://tp47.gitlab.io/kraft/post/2019-10-28-project-structures/
+- Cool Tic-Tac-Toe example by Preetham: https://github.hc.ag/pthejeswi/go_tictactoe
+- Eneko's repo of Go examples (and PDF): https://github.com/enolgor/tgpl
