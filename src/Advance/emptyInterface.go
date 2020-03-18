@@ -15,5 +15,5 @@ func main() {
 }
 
 func describe(i interface{}) {
-	fmt.Println("(%v, %T)\n", i, i)
+	fmt.Printf("(%v, %T)\n", i, i)
 }
