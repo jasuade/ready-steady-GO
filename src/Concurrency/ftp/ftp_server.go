@@ -18,7 +18,7 @@ const BUFF_SIZE int = 1024
 const ADDR = "localhost"
 const PORT = "5000"
 
-type Arguments struct {
+type Handler struct {
 	Addr string
 	Port string
 	Dir  string
@@ -26,8 +26,8 @@ type Arguments struct {
 
 func main() {
 
-	args := &Arguments{}
-	args.readArguments()
+	args := &Handler{}
+	args.readHandlerData()
 
 	listener, err := net.Listen("tcp", args.Addr+":"+args.Port)
 	if err != nil {
@@ -50,7 +50,7 @@ func main() {
 	}
 }
 
-func (args *Arguments) readArguments() error {
+func (args *Handler) readHandlerData() error {
 	args.Dir, _ = filepath.Abs("./")
 
 	if len(os.Args) > 1 {
@@ -72,7 +72,7 @@ func sendMessage(conn net.Conn, s string) error {
 	return nil
 }
 
-func (args *Arguments) handleConn(conn net.Conn) {
+func (args *Handler) handleConn(conn net.Conn) {
 	buff := make([]byte, BUFF_SIZE)
 	for {
 		n, err := conn.Read(buff)
@@ -142,17 +142,17 @@ func getFile(conn net.Conn, fileName string) error {
 	fileName = fileInfo.Name()
 
 	buff := make([]byte, BUFF_SIZE)
-	var fileContent string
+	var fileContent []byte
 
 	for {
 		n, err := file.Read(buff)
 		if err == io.EOF {
 			break
 		}
-		fileContent += string(buff[:n])
+		fileContent = append(fileContent, buff[:n]...)
 	}
 
-	encodedFileContent := base64.StdEncoding.EncodeToString([]byte(fileContent))
+	encodedFileContent := base64.StdEncoding.EncodeToString(fileContent)
 	sendMessage(conn, string("file;"+fileName+";"+encodedFileContent))
 	return nil
 }
@@ -171,7 +171,7 @@ func changeDirectory(conn net.Conn, s string) error {
 	return nil
 }
 
-func (args *Arguments) closeConnection(conn net.Conn) error {
+func (args *Handler) closeConnection(conn net.Conn) error {
 	err := os.Chdir(args.Dir)
 	if err != nil {
 		return errors.New("Unable to return to original working directory " + err.Error())
