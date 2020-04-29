@@ -13,10 +13,20 @@ import (
 
 const EOS rune = 004
 const BUFF_SIZE int = 1024
+const ADDR = "localhost"
+const PORT = "5000"
 
 func main() {
-	server := os.Args[1]
-	conn, err := net.Dial("tcp", server+":5000")
+	server := ADDR
+	if len(os.Args) > 1 && os.Args[1] != "" {
+		server = os.Args[1]
+	}
+	port := PORT
+	if len(os.Args) > 2 && os.Args[2] != "" {
+		port = os.Args[2]
+	}
+
+	conn, err := net.Dial("tcp", server+":"+port)
 	if err != nil {
 		log.Fatal(err)
 	}

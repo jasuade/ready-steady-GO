@@ -2,20 +2,34 @@ package main
 
 import (
 	base64 "encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 const EOS rune = 004
 const BUFF_SIZE int = 1024
+const ADDR = "localhost"
+const PORT = "5000"
+
+type Arguments struct {
+	Addr string
+	Port string
+	Dir  string
+}
 
 func main() {
-	listener, err := net.Listen("tcp", "localhost:5000")
+
+	args := &Arguments{}
+	args.readArguments()
+
+	listener, err := net.Listen("tcp", args.Addr+":"+args.Port)
 	if err != nil {
 		log.Fatal("Error listening %v ", err)
 		os.Exit(1)
@@ -25,77 +39,106 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Print("Error executing Acceting request %v ", err)
+			log.Fatal("Error Acceping request", err)
 			continue
 		}
-		sendMessage(conn, "|| You connected to Jara's FTP server || \n ____________________________________ \n ____________________________________ \n ")
-		go handleConn(conn)
+		err = sendMessage(conn, "|| You connected to Jara's FTP server || \n ____________________________________ \n ____________________________________ \n ")
+		if err != nil {
+			continue
+		}
+		go args.handleConn(conn)
 	}
 }
 
-func sendMessage(conn net.Conn, s string) {
+func (args *Arguments) readArguments() error {
+	args.Dir, _ = filepath.Abs("./")
+
+	if len(os.Args) > 1 {
+		args.Addr = os.Args[1]
+		args.Port = os.Args[2]
+		return nil
+	}
+	args.Addr = ADDR
+	args.Port = PORT
+	return nil
+}
+
+func sendMessage(conn net.Conn, s string) error {
 	strings.Trim(s, " ")
 	_, err := conn.Write([]byte(s + string(EOS)))
 	if err != nil {
-		log.Print("Error sending message %v", err)
-		return
+		return err
 	}
+	return nil
 }
 
-func handleConn(conn net.Conn) {
-	buff := make([]byte, 1024)
+func (args *Arguments) handleConn(conn net.Conn) {
+	buff := make([]byte, BUFF_SIZE)
 	for {
 		n, err := conn.Read(buff)
 		if err != nil && err != io.EOF {
-			log.Print("Error %v", err)
-			return
+			sendMessage(conn, err.Error())
 		}
 
-		command := fmt.Sprintln(string(buff[:n]))
-		strings.Trim(command, " \n")
-		s := strings.Split(command, " ")
+		commandWithArgs := string(buff[:n])
+		command := strings.SplitN(commandWithArgs, " ", 2)
 
-		switch strings.Trim(s[0], " \n") {
+		switch strings.TrimSpace(command[0]) {
 		case "cd":
-			changeDirectory(conn, fmt.Sprintf("%s", strings.Trim(s[1], " \n")))
+			err := changeDirectory(conn, strings.TrimSpace(command[1]))
+			if err != nil {
+				sendMessage(conn, err.Error())
+			}
 			continue
 		case "ls":
 			listFiles(conn)
 			continue
 		case "get":
-			getFile(conn, fmt.Sprintf("%s", strings.Trim(s[1], " \n")))
+			err := getFile(conn, strings.TrimSpace(command[1]))
+			if err != nil {
+				sendMessage(conn, err.Error())
+			}
 			continue
 		case "close":
-			closeConnection(conn)
+			err := args.closeConnection(conn)
+			if err != nil {
+				sendMessage(conn, err.Error())
+			}
+			continue
+		case "help":
+			sendMessage(conn, "cd <path>\t To move between directories\n"+
+				"ls \t\t To list the files and directories\n"+
+				"get <file> \t To obtain the indicated file\n"+
+				"close\t\t To close connection \n"+
+				"help \t\t To display list of commands")
 			continue
 		default:
+			sendMessage(conn, "This is not a valid command, use help to see the valid commands")
 			continue
 		}
 	}
-
 }
-func listFiles(conn net.Conn) {
+func listFiles(conn net.Conn) error {
 	output, err := exec.Command("ls", "-l").Output()
 	log.Println(string(output))
 	if err != nil {
-		log.Fatal("Error executing ls %v", err)
-		return
+		return err
+
 	}
 	sendMessage(conn, fmt.Sprintf("%s", output))
+	return nil
 }
 
-func getFile(conn net.Conn, fileName string) {
+func getFile(conn net.Conn, fileName string) error {
 	file, err := os.Open(fileName)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
+
 	}
 	fileInfo, err := file.Stat()
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
-	//fileSize := fileInfo.Size()
 	fileName = fileInfo.Name()
 
 	buff := make([]byte, BUFF_SIZE)
@@ -111,25 +154,29 @@ func getFile(conn net.Conn, fileName string) {
 
 	encodedFileContent := base64.StdEncoding.EncodeToString([]byte(fileContent))
 	sendMessage(conn, string("file;"+fileName+";"+encodedFileContent))
-
+	return nil
 }
 
-func changeDirectory(conn net.Conn, s string) {
+func changeDirectory(conn net.Conn, s string) error {
 	err := os.Chdir("./" + s)
 	if err != nil {
-		sendMessage(conn, fmt.Sprintf("Directory %s does not exist", s))
-		return
+		return err
 	}
 	dir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	log.Println(dir)
 	sendMessage(conn, dir)
+	return nil
 }
 
-func closeConnection(conn net.Conn) {
+func (args *Arguments) closeConnection(conn net.Conn) error {
+	err := os.Chdir(args.Dir)
+	if err != nil {
+		return errors.New("Unable to return to original working directory " + err.Error())
+	}
 	defer conn.Close()
 	sendMessage(conn, "exit")
+	return nil
 }
