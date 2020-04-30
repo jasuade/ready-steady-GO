@@ -15,7 +15,7 @@ import (
 
 const EOS rune = 004
 const BUFF_SIZE int = 1024
-const ADDR = "localhost"
+const ADDR = "0.0.0.0"
 const PORT = "5000"
 
 type Handler struct {
@@ -31,7 +31,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", args.Addr+":"+args.Port)
 	if err != nil {
-		log.Fatal("Error listening %v ", err)
+		log.Fatal(err)
 		os.Exit(1)
 	}
 	defer listener.Close()
@@ -53,11 +53,15 @@ func main() {
 func (args *Handler) readHandlerData() error {
 	args.Dir, _ = filepath.Abs("./")
 
-	if len(os.Args) > 1 {
+	if len(os.Args) > 1 && os.Args[1] != "" {
 		args.Addr = os.Args[1]
+		return nil
+	}
+	if len(os.Args) > 2 && os.Args[2] != "" {
 		args.Port = os.Args[2]
 		return nil
 	}
+
 	args.Addr = ADDR
 	args.Port = PORT
 	return nil
